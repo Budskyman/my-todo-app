@@ -1,66 +1,83 @@
 const express = require('express');
 const bodyParser = require('body-parser');
+const mongoose = require('mongoose');
 const app = express();
 
-let todos = [];  // Pastikan array todos dimulai kosong
+// === 🔗 Koneksi MongoDB ===
+mongoose.connect('mongodb://127.0.0.1:27017/todolistDB', {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+}).then(() => {
+  console.log('✅ Terhubung ke MongoDB!');
+}).catch(err => {
+  console.error('❌ Gagal konek MongoDB:', err);
+});
 
-// Format tanggal agar lebih mudah dibaca
-function formatDate(dateString) {
-  const date = new Date(dateString);
-  const options = { 
-    weekday: 'long', 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric', 
-    hour: '2-digit', 
-    minute: '2-digit', 
-    second: '2-digit' 
-  };
-  return date.toLocaleString('id-ID', options); // Menggunakan format Indonesia
-}
+// === 🔤 Schema & Model ===
+const todoSchema = new mongoose.Schema({
+  text: String,
+  dueDate: Date,
+  notified: Boolean
+});
+const Todo = mongoose.model('Todo', todoSchema);
 
+// === 🛠 Middleware & Setup ===
 app.set('view engine', 'ejs');
 app.use(express.static('public'));
 app.use(bodyParser.urlencoded({ extended: true }));
 
+// === 🌐 GET Homepage ===
+app.get("/", async (req, res) => {
+  try {
+    const todos = await Todo.find();
+    res.render("index", { todos });
+  } catch (err) {
+    console.error("❌ Error saat ambil data:", err);
+    res.status(500).send("Gagal mengambil data tugas");
+  }
+});
+
+// === ➕ Tambah Tugas ===
+app.post('/add', async (req, res) => {
+  const { todo, dueDate } = req.body;
+  if (todo && dueDate) {
+    try {
+      const newTask = new Todo({
+        text: todo,
+        dueDate: new Date(dueDate),
+        notified: false
+      });
+      await newTask.save();
+      console.log("✅ Tugas ditambahkan:", newTask);
+    } catch (err) {
+      console.error("❌ Gagal tambah tugas:", err);
+    }
+  }
+  res.redirect('/');
+});
+
+// === ❌ Hapus Tugas Berdasarkan Index ===
+app.post('/delete', async (req, res) => {
+  try {
+    const index = parseInt(req.body.index);
+    const todos = await Todo.find();
+    if (!isNaN(index) && todos[index]) {
+      await Todo.deleteOne({ _id: todos[index]._id });
+      console.log("🗑️ Tugas dihapus:", todos[index].text);
+    }
+  } catch (err) {
+    console.error("❌ Gagal hapus tugas:", err);
+  }
+  res.redirect('/');
+});
+
+// === ⚠️ Error Middleware ===
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).send('Something broke!');
 });
 
-// Express route untuk menampilkan halaman
-app.get("/", (req, res) => {
-  // Jangan masukkan tugas default
-  res.render("index", { todos });  // Mengirimkan todos yang sudah ada
-});
-
-// Menambahkan tugas baru
-app.post('/add', (req, res) => {
-  const task = req.body.todo;
-  const dueDate = req.body.dueDate;
-
-  console.log('Tugas diterima:', task);
-  console.log('Tanggal diterima:', dueDate);
-
-  if (task && dueDate) {
-    const formattedDate = new Date(dueDate).toISOString();  // Format ISO yang valid
-    todos.push({ text: task, dueDate: formattedDate, notified: false });
-    console.log('Todos setelah ditambah:', todos); // Pastikan hanya tugas baru yang ditambahkan
-  }
-
-  res.redirect('/');
-});
-
-// Menghapus tugas
-app.post('/delete', (req, res) => {
-  const index = parseInt(req.body.index);
-  if (!isNaN(index)) {
-    todos.splice(index, 1);
-    console.log('Todos setelah dihapus:', todos); // Pastikan tugas dihapus dengan benar
-  }
-  res.redirect('/');
-});
-
+// === 🚀 Start Server ===
 const PORT = 3000;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

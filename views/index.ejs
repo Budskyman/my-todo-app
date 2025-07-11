@@ -6,7 +6,6 @@
   <link rel="stylesheet" href="/styles.css">
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
   <style>
-    /* CSS tambahan untuk tombol hapus */
     .delete-button {
       background-color: #e74c3c;
       color: white;
@@ -16,9 +15,35 @@
       font-size: 14px;
       border-radius: 5px;
     }
-    
+
     .delete-button:hover {
       background-color: #c0392b;
+    }
+
+    #custom-notif {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: #2c3e50;
+      color: white;
+      padding: 30px;
+      border-radius: 15px;
+      box-shadow: 0 0 30px rgba(0,0,0,0.3);
+      z-index: 9999;
+      text-align: center;
+      font-family: 'Poppins', sans-serif;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+
+    #custom-notif.show {
+      opacity: 1;
+    }
+
+    #custom-notif.hidden {
+      opacity: 0;
+      pointer-events: none;
     }
   </style>
 </head>
@@ -26,27 +51,21 @@
   <div class="container">
     <h1>To-Do List</h1>
 
-    <!-- Menampilkan jam analog -->
     <canvas id="analog-clock" width="300" height="300"></canvas>
-
-    <!-- Menampilkan jam dan tanggal hari ini -->
     <div id="current-time"></div>
 
-    <!-- Form untuk menambahkan tugas dan waktu -->
     <form action="/add" method="POST" class="input-form">
       <input type="text" name="todo" placeholder="Tambahkan tugas..." required>
       <input type="datetime-local" name="dueDate" required>
       <button type="submit">Tambah</button>
     </form>
 
-    <!-- Daftar tugas -->
     <ul class="todo-list">
       <% if (todos && todos.length > 0) { %>
         <% todos.forEach((item, index) => { %>
           <li class="fade-in">
             <span><%= item.text %></span>
-            <span class="due-time"> - <%= item.dueDate %></span>
-            <!-- Tombol untuk menghapus tugas -->
+            <span class="due-time" data-duedate="<%= item.dueDate %>"> - </span>
             <form action="/delete" method="POST" style="display:inline;">
               <input type="hidden" name="index" value="<%= index %>">
               <button type="submit" class="delete-button">Hapus</button>
@@ -57,157 +76,170 @@
         <li class="fade-in">Tidak ada tugas</li>
       <% } %>
     </ul>
-
   </div>
 
-  <!-- Tambahkan elemen audio untuk suara notifikasi -->
   <audio id="notification-sound" src="/sounds/notification-sound.mp3" preload="auto"></audio>
 
-  <script>
-  const notificationSound = document.getElementById('notification-sound'); // Suara notifikasi
-  const todos = <%- JSON.stringify(todos) %>;  // Mengambil todos dari server
+  <div id="custom-notif" class="hidden">
+    <h2 id="notif-title">Tugas Jatuh Tempo!</h2>
+    <p id="notif-body">Isi tugas di sini</p>
+  </div>
 
-  // Meminta izin untuk menampilkan notifikasi browser
-  function requestNotificationPermission() {
-    if (Notification.permission !== 'granted') {
-      Notification.requestPermission().then(permission => {
-        if (permission === 'granted') {
-          console.log("Notifikasi diizinkan");
-        } else {
-          console.log("Notifikasi ditolak");
+  <script>
+    const notificationSound = document.getElementById('notification-sound');
+    const todos = <%- JSON.stringify(todos) %>;
+    const notifiedSet = new Set();
+
+    // Format tanggal tampilan
+    document.querySelectorAll('.due-time').forEach(span => {
+      const iso = span.dataset.duedate;
+      const date = new Date(iso);
+      const options = {
+        weekday: 'long', year: 'numeric', month: 'long',
+        day: 'numeric', hour: '2-digit', minute: '2-digit'
+      };
+      span.textContent = ' - ' + date.toLocaleString('id-ID', options);
+    });
+
+    function requestNotificationPermission() {
+      if (Notification.permission !== 'granted') {
+        Notification.requestPermission().then(permission => {
+          if (permission === 'granted') {
+            console.log("Notifikasi diizinkan");
+          } else {
+            console.warn("Notifikasi ditolak");
+          }
+        });
+      }
+    }
+
+    function showCustomNotification(title, message) {
+      const notif = document.getElementById('custom-notif');
+      document.getElementById('notif-title').textContent = title;
+      document.getElementById('notif-body').textContent = message;
+
+      notif.classList.remove('hidden');
+      notif.classList.add('show');
+
+      setTimeout(() => {
+        notif.classList.remove('show');
+        notif.classList.add('hidden');
+      }, 5000);
+    }
+
+    function checkForDueTasks() {
+      const now = new Date();
+      todos.forEach((item, index) => {
+        const dueDate = new Date(item.dueDate);
+        if (isNaN(dueDate.getTime())) return;
+
+        if (now >= dueDate && !notifiedSet.has(index)) {
+          // 🔊 Sound
+          notificationSound.pause();
+          notificationSound.currentTime = 0;
+          notificationSound.play();
+
+          // 🧾 Custom center notification
+          showCustomNotification(
+            'Tugas Jatuh Tempo!',
+            `${item.text}\n${dueDate.toLocaleString('id-ID')}`
+          );
+
+          // 🔔 Native browser notification
+          if (Notification.permission === 'granted') {
+            new Notification('Tugas Jatuh Tempo!', {
+              body: `${item.text}\n${dueDate.toLocaleString('id-ID')}`,
+              icon: '/icons/bell.png'
+            });
+          }
+
+          // ✅ Tandai sudah dinotifikasi
+          notifiedSet.add(index);
         }
       });
-    } else {
-      console.log("Notifikasi sudah diizinkan sebelumnya");
     }
-  }
 
-  // Fungsi untuk memeriksa tugas yang sudah lewat waktunya
-  function checkForDueTasks() {
-    const now = new Date();
-    todos.forEach((item, index) => {
-      const dueDate = new Date(item.dueDate);
+    requestNotificationPermission();
+    setInterval(checkForDueTasks, 1000);
 
-      // Cek validitas dueDate
-      if (isNaN(dueDate.getTime())) {
-        console.error(`Tanggal tidak valid untuk tugas: ${item.text}`);
-        console.log(`dueDate yang diterima: ${item.dueDate}`);
-        return;  // Skip tugas yang memiliki tanggal tidak valid
+    // Analog clock
+    const canvas = document.getElementById('analog-clock');
+    const ctx = canvas.getContext('2d');
+    const radius = canvas.height / 2;
+    ctx.translate(radius, radius);
+    const clockRadius = radius * 0.9;
+
+    function drawClock() {
+      const now = new Date();
+      const hour = now.getHours();
+      const minute = now.getMinutes();
+      const second = now.getSeconds();
+
+      ctx.clearRect(-radius, -radius, canvas.width, canvas.height);
+
+      ctx.beginPath();
+      ctx.arc(0, 0, clockRadius, 0, 2 * Math.PI);
+      ctx.fillStyle = '#f3f3f3';
+      ctx.fill();
+      ctx.strokeStyle = '#2c3e50';
+      ctx.lineWidth = 10;
+      ctx.stroke();
+
+      ctx.font = '20px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (let i = 1; i <= 12; i++) {
+        const angle = (i - 3) * Math.PI / 6;
+        const x = (clockRadius - 30) * Math.cos(angle);
+        const y = (clockRadius - 30) * Math.sin(angle);
+        ctx.fillStyle = '#2c3e50';
+        ctx.fillText(i, x, y);
       }
 
-      // Debugging: Log waktu sekarang dan dueDate
-      console.log(`Sekarang: ${now}, Due date: ${dueDate}`);
-      
-      // Cek apakah waktu sekarang sudah melewati waktu tugas
-      if (now >= dueDate && !item.notified) {
-        console.log(`Tugas " ${item.text} " sudah lewat waktunya!`);
+      const hourAngle = (Math.PI / 6) * ((hour % 12) + minute / 60);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(clockRadius * 0.5 * Math.cos(hourAngle - Math.PI / 2), clockRadius * 0.5 * Math.sin(hourAngle - Math.PI / 2));
+      ctx.strokeStyle = '#2c3e50';
+      ctx.lineWidth = 10;
+      ctx.stroke();
 
-        // Menampilkan kotak dialog
-        alert(`Tugas jatuh tempo! \n\nTugas: ${item.text} \nWaktu: ${item.dueDate}`);
+      const minuteAngle = (Math.PI / 30) * minute;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(clockRadius * 0.7 * Math.cos(minuteAngle - Math.PI / 2), clockRadius * 0.7 * Math.sin(minuteAngle - Math.PI / 2));
+      ctx.strokeStyle = '#3498db';
+      ctx.lineWidth = 6;
+      ctx.stroke();
 
-        // Mainkan suara hanya ketika tugas sudah jatuh tempo
-        notificationSound.pause(); // Matikan suara terlebih dahulu jika sudah ada yang berbunyi
-        notificationSound.currentTime = 0; // Reset ke awal
-        notificationSound.play(); // Mainkan suara
+      const secondAngle = (Math.PI / 30) * second;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(clockRadius * 0.8 * Math.cos(secondAngle - Math.PI / 2), clockRadius * 0.8 * Math.sin(secondAngle - Math.PI / 2));
+      ctx.strokeStyle = '#e74c3c';
+      ctx.lineWidth = 3;
+      ctx.stroke();
 
-        // Tandai tugas sebagai sudah diberi notifikasi
-        item.notified = true;
-      }
-    });
-  }
-
-  // Update jam setiap detik dan cek tugas setiap detik
-  setInterval(() => {
-    checkForDueTasks(); // Cek tugas setiap detik
-  }, 1000);
-
-  // Meminta izin notifikasi ketika halaman pertama kali dimuat
-  requestNotificationPermission();
-
-  // Script untuk update jam analog secara real-time
-  const canvas = document.getElementById('analog-clock');
-  const ctx = canvas.getContext('2d');
-  const radius = canvas.height / 2;
-  ctx.translate(radius, radius); // Pindahkan pusat canvas ke tengah
-  const clockRadius = radius * 0.9;
-
-  // Draw the clock
-  function drawClock() {
-    const now = new Date();
-    const hour = now.getHours();
-    const minute = now.getMinutes();
-    const second = now.getSeconds();
-
-    // Clear the canvas
-    ctx.clearRect(-radius, -radius, canvas.width, canvas.height);
-
-    // Draw the clock face
-    ctx.beginPath();
-    ctx.arc(0, 0, clockRadius, 0, 2 * Math.PI);
-    ctx.fillStyle = '#f3f3f3';
-    ctx.fill();
-    ctx.strokeStyle = '#2c3e50';
-    ctx.lineWidth = 10;
-    ctx.stroke();
-    
-    // Draw hour ticks (numbers) at correct positions
-    ctx.font = '20px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    for (let i = 1; i <= 12; i++) {
-      const angle = (i - 3) * Math.PI / 6;  // Perbaiki sudut agar angka mulai dari atas (12)
-      const x = (clockRadius - 30) * Math.cos(angle);
-      const y = (clockRadius - 30) * Math.sin(angle);
+      ctx.beginPath();
+      ctx.arc(0, 0, 8, 0, 2 * Math.PI);
       ctx.fillStyle = '#2c3e50';
-      ctx.fillText(i, x, y);
+      ctx.fill();
     }
 
-    // Draw the hour hand
-    const hourAngle = (Math.PI / 6) * ((hour % 12) + minute / 60);
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(clockRadius * 0.5 * Math.cos(hourAngle - Math.PI / 2), clockRadius * 0.5 * Math.sin(hourAngle - Math.PI / 2));
-    ctx.strokeStyle = '#2c3e50';
-    ctx.lineWidth = 10;
-    ctx.stroke();
-    
-    // Draw the minute hand
-    const minuteAngle = (Math.PI / 30) * minute;
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(clockRadius * 0.7 * Math.cos(minuteAngle - Math.PI / 2), clockRadius * 0.7 * Math.sin(minuteAngle - Math.PI / 2));
-    ctx.strokeStyle = '#3498db';
-    ctx.lineWidth = 6;
-    ctx.stroke();
-    
-    // Draw the second hand
-    const secondAngle = (Math.PI / 30) * second;
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(clockRadius * 0.8 * Math.cos(secondAngle - Math.PI / 2), clockRadius * 0.8 * Math.sin(secondAngle - Math.PI / 2));
-    ctx.strokeStyle = '#e74c3c'; // Red color for second hand
-    ctx.lineWidth = 3;
-    ctx.stroke();
+    setInterval(drawClock, 1000);
+    drawClock();
 
-    // Draw the center circle (clock's center)
-    ctx.beginPath();
-    ctx.arc(0, 0, 8, 0, 2 * Math.PI);
-    ctx.fillStyle = '#2c3e50';
-    ctx.fill();
-  }
+    function updateTime() {
+      const now = new Date();
+      const options = {
+        weekday: 'long', year: 'numeric', month: 'long',
+        day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit'
+      };
+      document.getElementById('current-time').textContent = now.toLocaleString('id-ID', options);
+    }
 
-  // Update the clock every second
-  setInterval(drawClock, 1000);
-  drawClock(); // Initial draw
-
-  // Script untuk update jam dan tanggal hari ini
-  function updateTime() {
-    const now = new Date();
-    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
-    document.getElementById('current-time').textContent = now.toLocaleString('id-ID', options);
-  }
-
-  setInterval(updateTime, 1000);  // Update every second
-</script>
+    setInterval(updateTime, 1000);
+    updateTime();
+  </script>
 </body>
 </html>
