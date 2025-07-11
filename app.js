@@ -10,10 +10,11 @@ require('dotenv').config(); // Tambahkan ini paling atas
 mongoose.connect(process.env.MONGO_URL, {
   useNewUrlParser: true,
   useUnifiedTopology: true
-});
-then(() => {
+})
+.then(() => {
   console.log('✅ Terhubung ke MongoDB!');
-}).catch(err => {
+})
+.catch(err => {
   console.error('❌ Gagal konek MongoDB:', err);
 });
 
