@@ -2,12 +2,16 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
 const app = express();
+require('dotenv').config();
 
 // === 🔗 Koneksi MongoDB ===
-mongoose.connect('mongodb://127.0.0.1:27017/todolistDB', {
+require('dotenv').config(); // Tambahkan ini paling atas
+
+mongoose.connect(process.env.MONGO_URL, {
   useNewUrlParser: true,
   useUnifiedTopology: true
-}).then(() => {
+});
+then(() => {
   console.log('✅ Terhubung ke MongoDB!');
 }).catch(err => {
   console.error('❌ Gagal konek MongoDB:', err);
