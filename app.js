@@ -4,17 +4,10 @@ const mongoose = require('mongoose');
 const app = express();
 require('dotenv').config();
 
-// === 🔗 Koneksi MongoDB ===
-require('dotenv').config(); // Tambahkan ini paling atas
-
-mongoose.connect(process.env.MONGO_URL, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
+mongoose.connect(process.env.MONGO_URL)
 .then(() => {
   console.log('✅ Terhubung ke MongoDB!');
-})
-.catch(err => {
+}).catch(err => {
   console.error('❌ Gagal konek MongoDB:', err);
 });
 
