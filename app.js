@@ -4,7 +4,12 @@ const mongoose = require('mongoose');
 const app = express();
 require('dotenv').config();
 
-mongoose.connect(process.env.MONGO_URL)
+// ✅ Cek URL dari .env
+const mongoURI = process.env.MONGO_URL;
+console.log("🌐 MongoDB URL:", mongoURI);
+
+// ✅ Koneksi ke MongoDB
+mongoose.connect(mongoURI)
   .then(() => console.log('✅ Terhubung ke MongoDB!'))
   .catch(err => console.error('❌ Gagal konek MongoDB:', err));
 
@@ -73,7 +78,7 @@ app.use((err, req, res, next) => {
 });
 
 // === 🚀 Start Server ===
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
