@@ -5,11 +5,8 @@ const app = express();
 require('dotenv').config();
 
 mongoose.connect(process.env.MONGO_URL)
-.then(() => {
-  console.log('✅ Terhubung ke MongoDB!');
-}).catch(err => {
-  console.error('❌ Gagal konek MongoDB:', err);
-});
+  .then(() => console.log('✅ Terhubung ke MongoDB!'))
+  .catch(err => console.error('❌ Gagal konek MongoDB:', err));
 
 // === 🔤 Schema & Model ===
 const todoSchema = new mongoose.Schema({
