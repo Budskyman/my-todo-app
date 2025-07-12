@@ -3,9 +3,62 @@
 <head>
   <meta charset="UTF-8">
   <title>To-Do List</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="/styles.css">
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
   <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f4f4f4;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    h1 {
+      text-align: center;
+      color: #2c3e50;
+    }
+
+    .input-form {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .input-form input,
+    .input-form button {
+      padding: 10px;
+      font-size: 16px;
+    }
+
+    .input-form input[type="text"] {
+      flex: 1;
+    }
+
+    .todo-list {
+      list-style-type: none;
+      padding: 0;
+    }
+
+    .todo-list li {
+      background-color: white;
+      padding: 15px;
+      margin-bottom: 10px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
     .delete-button {
       background-color: #e74c3c;
       color: white;
@@ -32,7 +85,6 @@
       box-shadow: 0 0 30px rgba(0,0,0,0.3);
       z-index: 9999;
       text-align: center;
-      font-family: 'Poppins', sans-serif;
       opacity: 0;
       transition: opacity 0.4s ease;
     }
@@ -44,6 +96,42 @@
     #custom-notif.hidden {
       opacity: 0;
       pointer-events: none;
+    }
+
+    #analog-clock {
+      display: block;
+      margin: 0 auto 20px;
+      max-width: 100%;
+      height: auto;
+    }
+
+    #current-time {
+      text-align: center;
+      margin-bottom: 20px;
+      font-size: 18px;
+      color: #34495e;
+    }
+
+    @media (max-width: 768px) {
+      .input-form {
+        flex-direction: column;
+      }
+
+      .input-form input,
+      .input-form button {
+        width: 100%;
+        margin: 5px 0;
+      }
+
+      .todo-list li {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .delete-button {
+        margin-top: 10px;
+        align-self: flex-end;
+      }
     }
   </style>
 </head>
@@ -63,7 +151,7 @@
     <ul class="todo-list">
       <% if (todos && todos.length > 0) { %>
         <% todos.forEach((item, index) => { %>
-          <li class="fade-in">
+          <li>
             <span><%= item.text %></span>
             <span class="due-time" data-duedate="<%= item.dueDate %>"> - </span>
             <form action="/delete" method="POST" style="display:inline;">
@@ -73,7 +161,7 @@
           </li>
         <% }) %>
       <% } else { %>
-        <li class="fade-in">Tidak ada tugas</li>
+        <li>Tidak ada tugas</li>
       <% } %>
     </ul>
   </div>
@@ -90,7 +178,6 @@
     const todos = <%- JSON.stringify(todos) %>;
     const notifiedSet = new Set();
 
-    // Format tanggal tampilan
     document.querySelectorAll('.due-time').forEach(span => {
       const iso = span.dataset.duedate;
       const date = new Date(iso);
@@ -134,18 +221,15 @@
         if (isNaN(dueDate.getTime())) return;
 
         if (now >= dueDate && !notifiedSet.has(index)) {
-          // 🔊 Sound
           notificationSound.pause();
           notificationSound.currentTime = 0;
           notificationSound.play();
 
-          // 🧾 Custom center notification
           showCustomNotification(
             'Tugas Jatuh Tempo!',
             `${item.text}\n${dueDate.toLocaleString('id-ID')}`
           );
 
-          // 🔔 Native browser notification
           if (Notification.permission === 'granted') {
             new Notification('Tugas Jatuh Tempo!', {
               body: `${item.text}\n${dueDate.toLocaleString('id-ID')}`,
@@ -153,7 +237,6 @@
             });
           }
 
-          // ✅ Tandai sudah dinotifikasi
           notifiedSet.add(index);
         }
       });
@@ -162,7 +245,7 @@
     requestNotificationPermission();
     setInterval(checkForDueTasks, 1000);
 
-    // Analog clock
+    // Jam analog
     const canvas = document.getElementById('analog-clock');
     const ctx = canvas.getContext('2d');
     const radius = canvas.height / 2;
