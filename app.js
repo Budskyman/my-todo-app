@@ -1,8 +1,8 @@
+require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
 const app = express();
-require('dotenv').config();
 
 // ✅ Cek URL dari .env
 const mongoURI = process.env.MONGO_URL;
