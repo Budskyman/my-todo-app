@@ -37,16 +37,20 @@ app.get("/", async (req, res) => {
   }
 });
 
-// === ➕ Tambah Tugas ===
+// === ➕ Tambah Tugas (dengan koreksi 7 jam ke UTC) ===
 app.post('/add', async (req, res) => {
   const { todo, dueDate } = req.body;
   if (todo && dueDate) {
     try {
+      const inputDate = new Date(dueDate);
+      inputDate.setHours(inputDate.getHours() - 7); // ⏱ Koreksi WIB ke UTC
+
       const newTask = new Todo({
         text: todo,
-        dueDate: new Date(dueDate),
+        dueDate: inputDate,
         notified: false
       });
+
       await newTask.save();
       console.log("✅ Tugas ditambahkan:", newTask);
     } catch (err) {
